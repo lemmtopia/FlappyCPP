@@ -38,6 +38,8 @@ i8 initialize_sdl_state() {
         return -3;
     }
 
+    //SDL_SetRenderVSync(sdl_state.renderer, SDL_WINDOW_SURFACE_VSYNC_ADAPTIVE);
+
     // Set virtual resolution
     SDL_SetRenderLogicalPresentation(sdl_state.renderer, BASE_W, BASE_H, SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
 
