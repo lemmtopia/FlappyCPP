@@ -9,12 +9,6 @@ static MIX_Audio* hurt_sound;
 static const f32 gravity = 0.2;
 
 void game_setup(void) {
-    char buff[32];
-
-    sprintf_s(buff, 32, "%d", sizeof(GameState));
-
-    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "TEST", buff, NULL);
-
     // Load textures
     atlas_texture = sdl_state_load_texture(sdl_state, "assets/textures/flappy_atlas.png");
     SDL_SetTextureScaleMode(atlas_texture, SDL_SCALEMODE_NEAREST);
