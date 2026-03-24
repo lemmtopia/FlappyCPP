@@ -14,7 +14,8 @@ int main(int argc, char** argv) {
     }
 
     i64 last_frame_time = SDL_GetTicks();
-    i64 frame_accumulator = 0;
+    f64 frame_accumulator = 0;
+    f32 fuzzy_factor = 2.0;
 
     // Initialize the game data
     game_setup();
@@ -32,9 +33,9 @@ int main(int argc, char** argv) {
         frame_accumulator += delta_time;
 
         process_exit_input();
-        while (frame_accumulator >= 1000 / (game_state.update_rate + 2)) {
+        while (frame_accumulator >= 1000.0 / (game_state.update_rate + fuzzy_factor)) {
             game_update();
-            frame_accumulator -= 1000 / game_state.update_rate;
+            frame_accumulator -= 1000.0 / game_state.update_rate;
             if (frame_accumulator < 0) frame_accumulator = 0;
         }
 
