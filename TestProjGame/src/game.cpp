@@ -6,7 +6,15 @@ static SDL_Texture* atlas_texture;
 static MIX_Audio* levelup_sound;
 static MIX_Audio* hurt_sound;
 
+static const f32 gravity = 0.2;
+
 void game_setup(void) {
+    char buff[32];
+
+    sprintf_s(buff, 32, "%d", sizeof(GameState));
+
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "TEST", buff, NULL);
+
     // Load textures
     atlas_texture = sdl_state_load_texture(sdl_state, "assets/textures/flappy_atlas.png");
     SDL_SetTextureScaleMode(atlas_texture, SDL_SCALEMODE_NEAREST);
@@ -70,17 +78,16 @@ void game_destroy_resources(void) {
     SDL_DestroyTexture(atlas_texture);
 }
 
-void entity_change_sprite_sheet(Entity* entity, u16 x, u16 y, u16 w, u16 h, u16 frame_count) {
+void entity_change_sprite_sheet(Entity* entity, u16 x, u16 y, u16 w, u16 h, u8 frame_count) {
     entity->sheet.src_x = x;
     entity->sheet.src_y = y;
     entity->sheet.src_w = w;
     entity->sheet.src_h = h;
 
     entity->sheet.frame_count = frame_count;
-    entity->sheet.frame_w = w / frame_count;
 }
 
-void entity_make_box(Entity* entity, i16 offx, i16 offy, u16 w, u16 h) {
+void entity_make_box(Entity* entity, i8 offx, i8 offy, u8 w, u8 h) {
     entity->box.offx = offx;
     entity->box.offy = offy;
     entity->box.w = w;
@@ -133,10 +140,13 @@ void update_entity(Entity* e, size_t e_index) {
     if (!e->allocated) {
         return;
     }
+
+    u16 frame_w = e->sheet.src_w / e->sheet.frame_count;
+
     switch (e->type) {
     case ENTITY_TYPE_PLAYER:
         if (game_state.player_death) {
-            e->velocity_y += game_state.gravity;
+            e->velocity_y += gravity;
             e->frame_timer = 0;
 
             // Game over
@@ -154,7 +164,7 @@ void update_entity(Entity* e, size_t e_index) {
                 e->velocity_y = -4;
             }
 
-            e->velocity_y += game_state.gravity;
+            e->velocity_y += gravity;
             if (e->velocity_y > 5) {
                 e->velocity_y = 5;
             }
@@ -188,12 +198,12 @@ void update_entity(Entity* e, size_t e_index) {
         }
         break;
     case ENTITY_TYPE_ENEMY:
-        if (e->x < -e->sheet.frame_w / 2) {
+        if (e->x < -frame_w / 2) {
             destroy_entity(e);
         }
         break;
     case ENTITY_TYPE_TREE:
-        if (e->x < -e->sheet.frame_w / 2) {
+        if (e->x < -frame_w / 2) {
             destroy_entity(e);
         }
         break;
@@ -239,17 +249,16 @@ void game_reset() {
     tree->sheet = tree_sprite_sheet;
     tree->velocity_x = -1;
     tree->box = tree_box;
-
-    game_state.gravity = 0.2f;
 }
 
 void draw_entity(Entity entity) {
-    u16 src_x = entity.sheet.src_x + entity.sheet.frame_w * entity.cur_frame;
+    u16 frame_w = entity.sheet.src_w / entity.sheet.frame_count;
+    u16 src_x = entity.sheet.src_x + frame_w * entity.cur_frame;
 
-    SDL_FRect src = { src_x, entity.sheet.src_y, entity.sheet.frame_w, entity.sheet.src_h };
-    SDL_FRect dst = { entity.x - entity.sheet.frame_w / 2, entity.y - entity.sheet.src_h / 2, entity.sheet.frame_w, entity.sheet.src_h };
+    SDL_FRect src = { src_x, entity.sheet.src_y, frame_w, entity.sheet.src_h };
+    SDL_FRect dst = { entity.x - frame_w / 2, entity.y - entity.sheet.src_h / 2, frame_w, entity.sheet.src_h };
     SDL_FlipMode flip = (entity.flip) ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE;
-    SDL_RenderTextureRotated(sdl_state.renderer, atlas_texture, &src, &dst, entity.angle, NULL, flip);
+    SDL_RenderTextureRotated(sdl_state.renderer, atlas_texture, &src, &dst, 0, NULL, flip);
 
     if (game_state.is_debug) {
         SDL_FRect box = { (entity.x - entity.box.w / 2) + entity.box.offx, (entity.y - entity.box.h / 2) + entity.box.offy, entity.box.w, entity.box.h };
