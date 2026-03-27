@@ -43,13 +43,21 @@ i8 initialize_sdl_state() {
     // Set virtual resolution
     SDL_SetRenderLogicalPresentation(sdl_state.renderer, BASE_W, BASE_H, SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
 
-    // Init mix
-    MIX_Init();
+    // Try to init mix
+    if (!MIX_Init()) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "MIX_Init failed!", SDL_GetError(), NULL);
+        return -4;
+    }
 
     sdl_state.mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
     if (sdl_state.mixer == NULL) {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "MIX_CreateMixerDevice failed!", SDL_GetError(), NULL);
-        return -4;
+        return -5;
+    }
+
+    if (!TTF_Init()) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "TTF_Init failed!", SDL_GetError(), NULL);
+        return -6;
     }
 
     return 0;
@@ -63,7 +71,9 @@ void process_exit_input(void) {
 }
 
 void destroy_sdl_state(void) {
+    TTF_Quit();
     MIX_DestroyMixer(sdl_state.mixer);
+    MIX_Quit();
     SDL_DestroyRenderer(sdl_state.renderer);
     SDL_DestroyWindow(sdl_state.window);
     SDL_Quit();

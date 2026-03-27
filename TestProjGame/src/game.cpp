@@ -5,8 +5,12 @@ GameState game_state;
 static SDL_Texture* atlas_texture;
 static MIX_Audio* levelup_sound;
 static MIX_Audio* hurt_sound;
+static TTF_Font* game_font;
 
-static const f32 gravity = 0.2;
+static f32 gravity = 0.2;
+
+static SDL_Color text_color = { 255, 255, 255, 255 };
+static SDL_FRect text_rect = { 0, 0, 18 * 6, 18 };
 
 void game_setup(void) {
     // Load textures
@@ -17,25 +21,37 @@ void game_setup(void) {
     levelup_sound = MIX_LoadAudio(sdl_state.mixer, "assets/sounds/levelup.wav", true);
     hurt_sound = MIX_LoadAudio(sdl_state.mixer, "assets/sounds/hurt.wav", true);
 
+    // Load font
+    game_font = TTF_OpenFont("assets/fonts/BadComic-Regular.ttf", 18);
+
     game_reset();
+
+    game_state.player_death = true;
+    gravity = 0;
 
     // Setup input state
     initialize_input_state();
 }
 
 void game_update(void) {
-    if (game_state.update_rate > 0 && !game_state.player_death) {
-        game_state.spawn_timer--;
-        if (game_state.spawn_timer <= 0) {
-            // Spawn enemy
-            Entity* enemy = initialize_entity(randf_range(BASE_W + 32, BASE_W * 2 + 32), randf_range(90, BASE_H - 90), ENTITY_TYPE_ENEMY);
-            enemy->flip = true;
-            enemy->velocity_x = -2;
-            enemy->sheet = enemy_sprite_sheet;
-            enemy->box = enemy_box;
-            entity_setup_animation(enemy, 3, 18);
+    if (!game_state.player_death) {
+        game_state.score += 0.1;
+        if (game_state.score > 9999) {
+            game_state.score = 9999;
+        }
 
-            game_state.spawn_timer = randf_range(game_state.update_rate * 2, game_state.update_rate * 4);
+        if (game_state.update_rate > 0) {
+            game_state.spawn_timer--;
+            if (game_state.spawn_timer <= 0) {
+                if (randf() > 0.45) {
+                    spawn_enemy();
+                }
+                else {
+                    spawn_tree();
+                }
+
+                game_state.spawn_timer = randf_range(game_state.update_rate * 2, game_state.update_rate * 4);
+            }
         }
     }
 
@@ -60,10 +76,23 @@ void game_render(void) {
         }
     }
 
+    char score_buff[16];
+    sprintf_s(score_buff, 16, "Score: %04d", (i32)game_state.score);
+
+    SDL_Texture* score_text = make_text_simple(game_font, score_buff, 11, text_color);
+    SDL_SetTextureScaleMode(score_text, SDL_SCALEMODE_NEAREST);
+
+    SDL_RenderTexture(sdl_state.renderer, score_text, NULL, &text_rect);
+
+    SDL_DestroyTexture(score_text);
+
     SDL_RenderPresent(sdl_state.renderer);
 }
 
 void game_destroy_resources(void) {
+    // Destroy font
+    TTF_CloseFont(game_font);
+
     // Destroy mixer
     MIX_DestroyAudio(levelup_sound);
     MIX_DestroyAudio(hurt_sound);
@@ -146,11 +175,11 @@ void update_entity(Entity* e, size_t e_index) {
             // Game over
             if (e->y > BASE_H + 80) {
                 e->y = BASE_H + 80;
+            }
 
-                if (input_state.keys[SDL_SCANCODE_SPACE] && !input_state.old_keys[SDL_SCANCODE_SPACE]) {
-                    game_state.entity_count = 0;
-                    game_reset();
-                }
+            if (input_state.keys[SDL_SCANCODE_SPACE] && !input_state.old_keys[SDL_SCANCODE_SPACE]) {
+                game_state.entity_count = 0;
+                game_reset();
             }
         }
         else {
@@ -169,6 +198,7 @@ void update_entity(Entity* e, size_t e_index) {
             if (e->y > BASE_H + 80 || e->y < 0) {
                 // Death by going outside the screen
                 e->velocity_y = -5;
+                e->flip = 2;
                 game_state.player_death = true;
             }
 
@@ -182,6 +212,7 @@ void update_entity(Entity* e, size_t e_index) {
                         MIX_PlayAudio(sdl_state.mixer, hurt_sound);
 
                         // Death by collision
+                        e->flip = 2;
                         game_state.player_death = true;
                         //destroy_entity(e2);
                         break;
@@ -219,6 +250,7 @@ void update_entity(Entity* e, size_t e_index) {
 
 void game_clear_entity_array(void) {
     for (size_t i = 0; i < MAX_ENTITIES; i++) {
+        game_state.entities[i] = {};
         game_state.entities[i].allocated = false;
     }
 }
@@ -227,6 +259,7 @@ void game_reset() {
     game_clear_entity_array();
 
     game_state.spawn_timer = 0;
+    game_state.score = 0;
 
     game_state.entity_count = 0;
     game_state.player_death = false;
@@ -239,10 +272,7 @@ void game_reset() {
     player->box = player_box;
     entity_setup_animation(player, 3, 12);
 
-    Entity* tree = initialize_entity(500, 280, ENTITY_TYPE_TREE);
-    tree->sheet = tree_sprite_sheet;
-    tree->velocity_x = -1;
-    tree->box = tree_box;
+    gravity = 0.2;
 }
 
 void draw_entity(Entity entity) {
@@ -251,11 +281,54 @@ void draw_entity(Entity entity) {
 
     SDL_FRect src = { src_x, entity.sheet.src_y, frame_w, entity.sheet.src_h };
     SDL_FRect dst = { entity.x - frame_w / 2, entity.y - entity.sheet.src_h / 2, frame_w, entity.sheet.src_h };
-    SDL_FlipMode flip = (entity.flip) ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE;
+    SDL_FlipMode flip = SDL_FLIP_NONE;
+    switch (entity.flip) {
+    case 1:
+        flip = SDL_FLIP_HORIZONTAL;
+        break;
+    case 2:
+        flip = SDL_FLIP_VERTICAL;
+        break;
+    case 3:
+        flip = SDL_FLIP_HORIZONTAL_AND_VERTICAL;
+        break;
+    default:
+        flip = SDL_FLIP_NONE;
+        break;
+    }
     SDL_RenderTextureRotated(sdl_state.renderer, atlas_texture, &src, &dst, 0, NULL, flip);
 
     if (game_state.is_debug) {
         SDL_FRect box = { (entity.x - entity.box.w / 2) + entity.box.offx, (entity.y - entity.box.h / 2) + entity.box.offy, entity.box.w, entity.box.h };
         SDL_RenderRect(sdl_state.renderer, &box);
     }
+}
+
+void spawn_enemy(void) {
+    // Spawn enemy
+    Entity* enemy = initialize_entity(randf_range(BASE_W + (2 * 32), BASE_W + (4 * 32)), randf_range(90, BASE_H - 90), ENTITY_TYPE_ENEMY);
+    enemy->flip = 1;
+    enemy->velocity_x = -2;
+    enemy->sheet = enemy_sprite_sheet;
+    enemy->box = enemy_box;
+    entity_setup_animation(enemy, 3, 18);
+}
+
+void spawn_tree(void) {
+    // Spawn tree
+    Entity* tree = initialize_entity(randf_range(BASE_W + (5 * 32), BASE_W + (8 * 32)), randf_range(270, BASE_H), ENTITY_TYPE_TREE);
+    tree->velocity_x = -1;
+    tree->sheet = tree_sprite_sheet;
+    tree->box = tree_box;
+    entity_setup_animation(tree, 1, 0);
+}
+
+SDL_Texture* make_text_simple(TTF_Font* font, char* text, size_t length, SDL_Color color) {
+    SDL_Surface* surf = TTF_RenderText_Solid(font, text, length, color);
+
+    SDL_Texture* tex = SDL_CreateTextureFromSurface(sdl_state.renderer, surf);
+
+    SDL_DestroySurface(surf);
+
+    return tex;
 }
