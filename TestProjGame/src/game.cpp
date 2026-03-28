@@ -10,7 +10,7 @@ static TTF_Font* game_font;
 static f32 gravity = 0.2;
 
 static SDL_Color text_color = { 255, 255, 255, 255 };
-static SDL_FRect text_rect = { 0, 0, 18 * 6, 18 };
+static SDL_FRect text_rect = { 0, 0, 18 * 6, 20 };
 
 void game_setup(void) {
     // Load textures
@@ -36,6 +36,11 @@ void game_setup(void) {
 void game_update(void) {
     if (!game_state.player_death) {
         game_state.score += 0.1;
+        if (game_state.score >= game_state.score_next) {
+            game_state.speed += 0.2;
+            game_state.score_next *= 1.5;
+        }
+
         if (game_state.score > 9999) {
             game_state.score = 9999;
         }
@@ -260,6 +265,8 @@ void game_reset() {
 
     game_state.spawn_timer = 0;
     game_state.score = 0;
+    game_state.score_next = 50;
+    game_state.speed = 1;
 
     game_state.entity_count = 0;
     game_state.player_death = false;
@@ -308,7 +315,7 @@ void spawn_enemy(void) {
     // Spawn enemy
     Entity* enemy = initialize_entity(randf_range(BASE_W + (2 * 32), BASE_W + (4 * 32)), randf_range(90, BASE_H - 90), ENTITY_TYPE_ENEMY);
     enemy->flip = 1;
-    enemy->velocity_x = -2;
+    enemy->velocity_x = -2 * game_state.speed;
     enemy->sheet = enemy_sprite_sheet;
     enemy->box = enemy_box;
     entity_setup_animation(enemy, 3, 18);
@@ -317,7 +324,7 @@ void spawn_enemy(void) {
 void spawn_tree(void) {
     // Spawn tree
     Entity* tree = initialize_entity(randf_range(BASE_W + (5 * 32), BASE_W + (8 * 32)), randf_range(270, BASE_H), ENTITY_TYPE_TREE);
-    tree->velocity_x = -1;
+    tree->velocity_x = -1 * game_state.speed;
     tree->sheet = tree_sprite_sheet;
     tree->box = tree_box;
     entity_setup_animation(tree, 1, 0);

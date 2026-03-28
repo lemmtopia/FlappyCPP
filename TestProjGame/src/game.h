@@ -44,6 +44,8 @@ struct GameState {
     u16 entity_count = 0;
 
     f32 score = 0;
+    f32 score_next = 50;
+    f32 speed = 1;
 
     Entity entities[MAX_ENTITIES];
 };
